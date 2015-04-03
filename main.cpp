@@ -3,36 +3,16 @@
 
 using namespace std;
 
+#define TWICE(x) x x
+
 struct Node
 {
     int data;
     Node* next;
 };
 
-Node* getOrderedList(size_t node_count)
+void getRandomList(Node* list, size_t node_count)
 {
-    Node* list = (Node*)calloc(node_count, sizeof(Node));
-    Node* current = list;
-    for (int i = 0; i < node_count; i++)
-    {
-        current->data = i+1;
-        if (i != node_count-1)
-        {
-            current->next = &list[i + 1];
-        }
-        else
-        {
-            current->next = list;
-        }
-        current = current->next;
-    }
-
-    return list;
-}
-
-Node* getRandomList(size_t node_count)
-{
-    Node* list = (Node*)calloc(node_count, sizeof(Node));
     Node* current = list;
     for (int i = 0; i < node_count; i++)
     {
@@ -48,8 +28,8 @@ Node* getRandomList(size_t node_count)
         while (!next_found)
         {
             size_t shift = rand() % node_count;
-            Node* next = &list[shift];
-            if (next->data == 0)
+            Node* next = list + shift;
+            if (!next->next)
             {
                 current->next = next;
                 current = next;
@@ -57,24 +37,35 @@ Node* getRandomList(size_t node_count)
             }
         }
     }
-
-    return list;
 }
 
-double walk(Node* list, size_t steps)
+void getOrderedList(Node* list, size_t node_count)
 {
     Node* current = list;
-
-//    clock_t start = clock();
-    uint64_t start = __rdtsc();
-
-    for (int i = 0; i < steps; ++i)
+    for (int i = 0; i < node_count; i++)
     {
-        current->data++;
+        current->data = i+1;
+        if (i != node_count-1)
+        {
+            current->next = list + i + 1;
+        }
+        else
+        {
+            current->next = list;
+        }
         current = current->next;
     }
-//        return (double)(clock() - start)*1000000/(CLOCKS_PER_SEC*steps);
-    return (__rdtsc() - start)/steps;
+}
+
+int walk(void* list, size_t steps)
+{
+    Node* current = (Node *) list;
+    uint64_t start = __rdtsc();
+    for (int i = 0; i < steps; ++i) 
+    {
+        TWICE(TWICE(TWICE(TWICE(TWICE(TWICE(TWICE(TWICE(current = current->next;))))))))
+    }
+    return (__rdtsc() - start) / (steps * 256);
 }
 
 int main(int argc, char** argv)
@@ -82,22 +73,26 @@ int main(int argc, char** argv)
     srand(time(NULL));
 
     Node* list = NULL;
-    for (int i = 1; i < 24; i++)
+    const size_t steps = 1 << 15;
+
+    for (int node_count_power = 1; node_count_power < 21; node_count_power++)
     {
-        const int node_count_power = i;
-        const size_t node_count = (size_t)(1 << node_count_power);
-        const size_t steps = node_count;
+        const size_t node_count = (size_t) (1 << node_count_power);
+        const size_t node_size = sizeof(Node);
+        list = (Node*)calloc(node_count, node_size);
+        cout << node_size * node_count / 1024;
 
-        list = getRandomList(node_count);
-        cout << node_count << ": " << walk(list, steps) << " ";
+        if (list != NULL)
+        {
+            getRandomList(list, node_count);
+            cout << " " << walk(list, steps);
 
-        list = getOrderedList(node_count);
-        cout << walk(list, steps) << endl;
+            getOrderedList(list, node_count);
+            cout << " " << walk(list, steps) << endl;
+
+            free(list);
+        }
     }
 
-    if (list != NULL)
-    {
-        free(list);
-    }
     return 0;
 }
